@@ -1,44 +1,37 @@
 version: "3"
 
 services:
-  webserver:
-    build: 
-      context: ./bin/webserver
-    container_name: 'chatFinder-container'
-    restart: 'always'
-    ports:
-      - "80:80"
-      - "443:443"
-    links: 
-      - mysql
-    volumes: 
-      - ${DOCUMENT_ROOT-../chatFinder}:/var/www
-      - ${PHP_INI-./config/php/php.ini}:/usr/local/etc/php/php.ini
-      - ${VHOSTS_DIR-./config/vhosts}:/etc/apache2/sites-enabled
-      - ${LOG_DIR-./logs/apache2}:/var/log/apache2
   mysql:
-    build: ./bin/mysql
-    container_name: 'mysql-container'
-    restart: 'always'
-    ports:
-      - "3306:3306"
-    volumes: 
-      - ${MYSQL_DATA_DIR-./data/mysql}:/var/lib/mysql
-      - ${MYSQL_LOG_DIR-./logs/mysql}:/var/log/mysql
+    image: mysql:8.0
+    restart: on-failure
     environment:
-      MYSQL_ROOT_PASSWORD: chatProject
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: 'phpmyadmin-container'
-    links:
-      - mysql
-    environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
+       MYSQL_ROOT_PASSWORD: root
+       MYSQL_DATABASE: example 
+  adminer:
+    image: adminer
+    restart: on-failure
     ports:
-      - '8080:80'
+      - '8080:8080'
+  nginx:
+    image: nginx:1.19.0-alpine
+    restart: on-failure
+    volumes:
+      - '${DOCUMENT_ROOT-../chatFinder/public}:/usr/src/app'
+      - './docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro'
+    ports:
+      - '80:80'
+    depends_on:
+      - php
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
     volumes: 
-      - /sessions
+      - '${DOCUMENT_ROOT-../chatFinder}:/usr/src/app'
+    restart: on-failure
+    env_file:
+      - .env
+    user: 1000:1000
   redis:
     container_name: 'redis-container'
     image: redis:latest
