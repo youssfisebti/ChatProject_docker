@@ -1,39 +1,60 @@
-version: "3"
+version: '3.5'
+
+networks:
+    nginxnetwork:
+      driver: bridge
+    mariadb_network:
+      external: false
 
 services:
-  mysql:
-    image: mysql:8.0
-    restart: on-failure
-    environment:
-       MYSQL_ROOT_PASSWORD: root
-       MYSQL_DATABASE: example 
-  adminer:
-    image: adminer
-    restart: on-failure
-    ports:
-      - '8080:8080'
+      
   nginx:
-    image: nginx:1.19.0-alpine
-    restart: on-failure
+    image: nginx:alpine
+    restart: unless-stopped
     volumes:
+      - /home/whisper40/nginxdockeralpine/files:/usr/share/nginx/html/
       - '${DOCUMENT_ROOT-../chatFinder/public}:/usr/src/app'
       - './docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro'
     ports:
       - '80:80'
     depends_on:
       - php
+    networks:
+      - nginxnetwork
+
   php:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-    volumes: 
+    image: php:fpm
+    restart: unless-stopped
+    volumes:
+      - /home/whisper40/nginxdockeralpine/files/:/usr/share/nginx/html/
       - '${DOCUMENT_ROOT-../chatFinder}:/usr/src/app'
-    restart: on-failure
-    env_file:
-      - .env
-    user: 1000:1000
-  redis:
-    container_name: 'redis-container'
-    image: redis:latest
+    networks:
+      - nginxnetwork
+      
+  db:
+    image: mariadb
+    restart: unless-stopped
+    volumes:
+      - /home/whisper40/nginxdockeralpine/bdd/:/var/lib/mysql/
+    environment:
+      - MYSQL_ROOT_PASSWORD=mdp
+      - MYSQL_USER=adminer
+      - MYSQL_PASSWORD=adminer
+      - MYSQL_DATABASE=adminer
+    networks:
+      - mariadb_network
+      
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    environment:
+      - ADMINER_DEFAULT_DB_DRIVER=mysql
+      - ADMINER_DEFAULT_DB_HOST=mariadb
+      - ADMINER_DEFAULT_DB_NAME=adminer
     ports:
-      - "6379:6379"
+      - 8080:8080
+    depends_on:
+      - db
+    networks:
+      - mariadb_network
+      - nginxnetwork
